@@ -1,3 +1,5 @@
+#include "kernel/procinfo.h"
+
 #define SBRK_ERROR ((char *)-1)
 
 struct stat;
