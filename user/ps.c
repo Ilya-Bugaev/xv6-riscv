@@ -63,13 +63,15 @@ main(void)
       printf("ps: ps_listinfo failed\n");
       free(buf);
       exit(1);
-
-      if (n <= cap)
-        break;
-
-      free(buf);
-      cap = n;
     }
+
+    if (n <= cap) {
+      break;
+    }
+
+    free(buf);
+    cap = n * 2;
+    
 
     /*
     Печатаем заголовок таблицы. Ширины подобраны так, чтобы
