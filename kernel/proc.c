@@ -701,3 +701,73 @@ procdump(void)
     printk("\n");
   }
 }
+
+int 
+ps_listinfo (uint64 plist, int lim)
+{
+  // создаем указатель на текущий процесс, чтобы потом узнать таблицу страниц и по виртуальному
+  // адресу в этой странице найти фактический
+  struct proc *my_p = myproc();
+
+  // вроде, это избыточно, потому что процесс-инициатор вызвал ecall, но в myproc написано,
+  // что возвращает 0, если что-то не так... так что вот такая проверка. мало ли че
+  if (my_p == 0) {
+    return -1;
+  }
+
+  // просто итератор
+  struct proc *p;
+
+  // это из условия, что не должны переполнять стек ядра
+  struct procinfo info;
+
+  // счетчик фактического количества процессов
+  int count = 0; 
+
+  if (lim < 0 || plist == 0) {
+    return -1;
+  }
+
+  acquire(&wait_lock);
+  
+  for (p = &proc[0]; p < &proc[NPROC]; p++) {
+
+    acquire(&p->lock);
+
+    if (p->state != USED && p->state != UNUSED) {
+      // сделай в утилите перелокацию, если count > lim
+      if (count < lim) {
+
+        memset(&info, 0, sizeof(info));
+        info.pid = p->pid;
+        info.state = p->state;
+        safestrcpy(info.name, p->name, sizeof(info.name));
+
+        if (p->parent) {
+          acquire(&p->parent->lock);
+          info.ppid = p->parent->pid;
+          release(&p->parent->lock);
+        } else {
+          info.ppid = 0;
+        }
+        
+        uint64 dest = plist + count * sizeof(info);
+
+        // вот это круто, мы берем pagetable текущего процесса, записываем туда данные процесса с kernel
+        if (copyout(my_p->pagetable, p->sz, dest, (char *)&info, sizeof(info)) == -1) {
+          release(&p->lock);
+          release(&wait_lock);
+          return -1;
+        }
+      }
+
+      count++;
+    }
+
+    release(&p->lock);
+  }
+
+  release(&wait_lock);
+
+  return count;
+}
